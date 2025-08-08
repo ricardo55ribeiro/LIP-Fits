@@ -27,8 +27,28 @@ using namespace RooFit;
 #include <RooFitResult.h>
 #include <RooFit.h>
 #include <RooCmdArg.h>
+#include <RooCurve.h>
 
 
+
+
+// Aux function to get the y-value of the drawn model at a given mass (for vertical lines)
+double getYatMass(RooPlot* frame, double mass) {
+    for (int i = 0; i < frame->numItems(); ++i) {
+        RooCurve* curve = dynamic_cast<RooCurve*>(frame->getObject(i));
+        if (!curve) continue;
+        int n = curve->GetN();
+        double* x = curve->GetX();
+        double* y = curve->GetY();
+        for (int j = 0; j < n - 1; ++j) {
+            if (x[j] <= mass && mass <= x[j+1]) {
+                double slope = (y[j+1] - y[j]) / (x[j+1] - x[j]);
+                return y[j] + slope * (mass - x[j]);
+            }
+        }
+    }
+    return 0.0;
+}
 
 // B+ Particle
 void total_data_fit_Bu() {
@@ -105,7 +125,7 @@ void total_data_fit_Bu() {
     double sig_yield_in_region = Nsig.getVal() * frac_sig_in_signal;  // Signal in signal region (S_data)
 
     // Open and process the MC file for signal region yield
-    TFile *file_mc = TFile::Open("/lstore/cms/henrique/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bu_phat5_Bfinder.root");
+    TFile *file_mc = TFile::Open("/lstore/cms/hlegoinha/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bu_phat5_Bfinder.root");
     if (!file_mc || file_mc->IsZombie()) {
         std::cerr << "Error: Could not open MC file." << std::endl;
         return;
@@ -132,43 +152,50 @@ void total_data_fit_Bu() {
 
     double f_s = sig_yield_in_region / mc_yield_in_signal;  // f_s calculation
 
-    // Plotting on a canvas
-    TCanvas *c = new TCanvas("c", "Bmass Fit (Gaussian model)", 800, 600);
+
+    TCanvas* c = new TCanvas("c", "Bmass Fit with Pulls", 800, 800);
+    c->Divide(1, 2);
+
+    // Top pad (fit)
+    TPad* p1 = (TPad*)c->cd(1);
+    p1->SetPad(0.0, 0.25, 1.0, 1.0);
+    p1->SetBottomMargin(0.02);
+    p1->Draw();
+    p1->cd();
+
+    // Draw the fit on the top frame (match styles to X3872 code)
     RooPlot* frame = B_mass.frame();
-    dataset.plotOn(frame, MarkerStyle(20), MarkerSize(1.2), Name("data"));
-    model.plotOn(frame, LineColor(kBlue), LineWidth(2), Name("global")); // Total model component
-    model.plotOn(frame, Components(expo_ext), LineColor(kRed), LineStyle(kDashed), LineWidth(2), Name("background")); // Background component
-    model.plotOn(frame, Components(signal), LineColor(kGreen+2), LineStyle(kDashed), LineWidth(2), Name("signal")); // Signal component
-    //model.plotOn(frame, Components(gauss1), LineColor(kMagenta+2), LineStyle(kDotted), LineWidth(1)); // Gauss 1
-    //model.plotOn(frame, Components(gauss2), LineColor(kOrange+7), LineStyle(kDotted), LineWidth(1)); // Gauss 2
+    dataset.plotOn(frame, MarkerStyle(20), MarkerSize(1.2), Name("data"), DataError(RooAbsData::Poisson));
+    model.plotOn(frame, LineColor(kBlue), LineWidth(2), Name("global"));
+    model.plotOn(frame, Components(expo_ext), LineColor(kRed), LineStyle(kDashed), LineWidth(2), Name("background"));
+    model.plotOn(frame, Components(signal), LineColor(kGreen+2), LineStyle(kDashed), LineWidth(2), Name("signal"));
 
     frame->SetTitle("");
-    frame->GetXaxis()->SetTitle("m_{J/#Psi K^{+}} [GeV/c^{2}]");
-    //frame->GetYaxis()->SetTitle(Form("Events"));
+    frame->GetYaxis()->SetTitleOffset(1.5);
+    frame->GetXaxis()->SetLabelSize(0); // hide x labels on top pad
     frame->Draw();
 
-    // Draw vertical lines at the edges of the signal region
-    double total_yield = Nsig.getVal() + Nbkg.getVal();
-    B_mass.setVal(min_signal);
-    double y_low = model.getVal(RooArgSet(B_mass)) * total_yield * bin_width;
-    B_mass.setVal(max_signal);
-    double y_high = model.getVal(RooArgSet(B_mass)) * total_yield * bin_width;
-    TLine* line_low = new TLine(min_signal, 0, min_signal, y_low);
+    // Vertical dashed lines at signal-region edges (line heights taken from the drawn curve)
+    double y_low  = getYatMass(frame, min_signal);
+    double y_high = getYatMass(frame, max_signal);
+
+    TLine* line_low  = new TLine(min_signal, 0, min_signal, y_low);
     TLine* line_high = new TLine(max_signal, 0, max_signal, y_high);
-    line_low->SetLineColor(kBlack);
-    line_low->SetLineStyle(2);
-    line_low->SetLineWidth(2);
-    line_high->SetLineColor(kBlack);
-    line_high->SetLineStyle(2);
-    line_high->SetLineWidth(2);
-    line_low->Draw("same");
-    line_high->Draw("same");
+    for (TLine* l : {line_low, line_high}) {
+        l->SetLineColor(kBlack);
+        l->SetLineStyle(2);
+        l->SetLineWidth(2);
+        l->Draw("same");
+    }
+
+
 
     // Calculate chi2/ndf for the fit
     int nParams = result->floatParsFinal().getSize();
     double chi2 = frame->chiSquare(nParams);
 
     // Create a legend (top-right) for the plot
+    p1->cd();
     TLegend* legend = new TLegend(0.56, 0.66, 0.88, 0.88);
     legend->SetTextFont(42);
     legend->SetTextSize(0.025);
@@ -182,6 +209,7 @@ void total_data_fit_Bu() {
     legend->Draw();
 
     // TPaveText for fit parameters (bottom-right)
+    p1->cd();
     TPaveText* pave = new TPaveText(0.64, 0.30, 0.88, 0.66, "NDC");
     pave->SetTextAlign(12);
     pave->SetTextFont(42);
@@ -204,6 +232,7 @@ void total_data_fit_Bu() {
     pave->Draw();
 
     // TPaveText for f_b and f_s (top-left or another suitable position)
+    p1->cd();
     TPaveText* pave_fb_fs = new TPaveText(0.44, 0.77, 0.56, 0.88, "NDC");
     pave_fb_fs->SetTextAlign(12);
     pave_fb_fs->SetTextFont(42);
@@ -214,8 +243,44 @@ void total_data_fit_Bu() {
     pave_fb_fs->AddText(Form("f_{s} = %.3f", f_s));
     pave_fb_fs->Draw();
 
+
+    // ---------- Bottom pad (pulls) ----------
+    TPad* p2 = (TPad*)c->cd(2);
+    p2->SetPad(0.0, 0.0, 1.0, 0.25);
+    p2->SetTopMargin(0.05);
+    p2->SetBottomMargin(0.25);
+    p2->Draw();
+    p2->cd();
+
+    RooPlot* pullFrame = B_mass.frame();
+    RooHist* pullHist = frame->pullHist("data", "global"); // names must match plotOn Name(...)
+    pullHist->SetMarkerSize(0.6);
+    pullFrame->addPlotable(pullHist, "XP");
+
+    pullFrame->SetTitle("");
+    pullFrame->GetYaxis()->SetTitle("Pull");
+    pullFrame->GetYaxis()->SetNdivisions(505);
+    pullFrame->GetYaxis()->SetTitleSize(0.10);
+    pullFrame->GetYaxis()->SetTitleOffset(0.40);
+    pullFrame->GetYaxis()->SetLabelSize(0.08);
+    pullFrame->GetXaxis()->SetTitle("m_{J/#Psi K^{+}} [GeV/c^{2}]");
+    pullFrame->GetXaxis()->SetTitleSize(0.10);
+    pullFrame->GetXaxis()->SetTitleOffset(1.0);
+    pullFrame->GetXaxis()->SetLabelSize(0.08);
+    pullFrame->SetMinimum(-3.5);
+    pullFrame->SetMaximum(3.5);
+    pullFrame->Draw("AP");
+
+    // Zero line
+    TLine* zeroLine = new TLine(xlow, 0, xhigh, 0);
+    zeroLine->SetLineColor(kBlue);
+    zeroLine->SetLineStyle(1);
+    zeroLine->SetLineWidth(1);
+    zeroLine->Draw("same");
+
+
     // Save the canvas to a file
-    TString name_file = "Bu_Total_Fit.pdf";
+    TString name_file = "Bu_Total_Fit_with_Pulls.pdf";
     c->SaveAs(name_file);
 
     // Console output summary
@@ -229,9 +294,10 @@ void total_data_fit_Bu() {
     std::cout << "f_s = " << f_s << std::endl << std::endl;
 
     // Clean up
-    delete c;
     delete line_low;
     delete line_high;
+    delete zeroLine;
+    delete c;
 }
 
 

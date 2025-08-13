@@ -13,7 +13,7 @@ using namespace RooFit;
 #include <RooRealVar.h>
 #include <RooDataSet.h>
 #include <RooDataHist.h>
-#include <RooGaussian.h>
+#include <RooGaussian.h> 
 #include <RooCBShape.h>
 #include <RooAddPdf.h>
 #include <RooPlot.h>
@@ -60,7 +60,8 @@ void fit_mc_signal_roofit(TString particle) {
     double x_max_legend = 0.0;
 
     if (particle == "Bd"){
-        path_to_file = "/lstore/cms/henrique/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bd_phat5_Bfinder.root";
+        path_to_file = "/lstore/cms/u25lekai/Bmeson/MC/ppRef/Bd_phat5_Bfinder.root";
+        ///lstore/cms/hlegoinha/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bd_phat5_Bfinder.root
         file_name = "Bd_Gaussian_Fit.pdf";
         path_to_tree = "Bfinder/ntKstar";
         X_Axis_Title = "m_{J/#Psi K^{*}} [GeV/c^{2}]";
@@ -74,7 +75,8 @@ void fit_mc_signal_roofit(TString particle) {
         
     }
     else if (particle == "Bu"){
-        path_to_file = "/lstore/cms/henrique/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bu_phat5_Bfinder.root";
+        path_to_file = "/lstore/cms/u25lekai/Bmeson/MC/ppRef/Bu_phat5_Bfinder.root";
+        // /lstore/cms/hlegoinha/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bu_phat5_Bfinder.root
         file_name = "Bu_Gaussian_Fit.pdf";
         path_to_tree = "Bfinder/ntKp";
         X_Axis_Title = "m_{J/#Psi K^{+}} [GeV/c^{2}]";
@@ -87,7 +89,7 @@ void fit_mc_signal_roofit(TString particle) {
         legend_name = "B^{+}";
     }
     else if (particle == "PSI2S"){
-        path_to_file = "/lstore/cms/henrique/X3872/MC_DATA/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder.root";
+        path_to_file = "/lstore/cms/hlegoinha/X3872/MC_DATA/prompt_PSI2S_to_Jpsi_pipi_phat5_Bfinder.root";
         file_name = "PSI2S_Gaussian_Fit.pdf";
         path_to_tree ="Bfinder/ntmix";
         X_Axis_Title = "m_{J/#Psi#pi^{+}#pi^{-}} [GeV/c^{2}]";
@@ -100,7 +102,7 @@ void fit_mc_signal_roofit(TString particle) {
         legend_name = "PSI2S";
     }
     else if (particle == "X3872"){
-        path_to_file = "/lstore/cms/henrique/X3872/MC_DATA/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder.root";
+        path_to_file = "/lstore/cms/hlegoinha/X3872/MC_DATA/prompt_X3872_to_Jpsi_Rho_phat5_Bfinder.root";
         file_name = "X3872_Gaussian_Fit.pdf";
         path_to_tree = "Bfinder/ntmix";
         X_Axis_Title = "m_{J/#Psi#rho} [GeV/c^{2}]";
@@ -168,19 +170,19 @@ void fit_mc_signal_roofit(TString particle) {
         params.mean_max = 5.3;
 
         params.sigma1_init = 0.014;
-        params.sigma1_min = 0.0125;
-        params.sigma1_max = 0.0155;
+        params.sigma1_min = 0.001;
+        params.sigma1_max = 0.07;
 
         params.sigma2_init = 0.034;
-        params.sigma2_min = 0.031;
-        params.sigma2_max = 0.037;
+        params.sigma2_min = 0.001;
+        params.sigma2_max = 0.09;
 
         params.c1_init = 0.8;
-        params.c1_min  = 0.77;
-        params.c1_max  = 0.83;
+        params.c1_min  = 0.01;
+        params.c1_max  = 0.99;
     
-        params.N_min = 152;
-        params.N_max = 162;
+        params.N_min = 0;
+        params.N_max = 90000;
     }
     else if (particle == "Bu"){
         params.interval_fit_min = 5.18;
@@ -191,19 +193,19 @@ void fit_mc_signal_roofit(TString particle) {
         params.mean_max = 5.3;
 
         params.sigma1_init = 0.036;
-        params.sigma1_min = 0.03;
-        params.sigma1_max = 0.044;
+        params.sigma1_min = 0.001;
+        params.sigma1_max = 0.09;
 
         params.sigma2_init = 0.011;
-        params.sigma2_min = 0.008;
-        params.sigma2_max = 0.014;
+        params.sigma2_min = 0.001;
+        params.sigma2_max = 0.07;
 
         params.c1_init = 0.52;
-        params.c1_min  = 0.48;
-        params.c1_max  = 0.56;   
+        params.c1_min  = 0.01;
+        params.c1_max  = 0.99;   
     
-        params.N_min = 380;
-        params.N_max = 400;
+        params.N_min = 0;
+        params.N_max = 90000;
     }
     else if (particle == "PSI2S"){
         params.interval_fit_min = 3.64;
@@ -214,19 +216,19 @@ void fit_mc_signal_roofit(TString particle) {
         params.mean_max = 3.8;
 
         params.sigma1_init = 0.0048;
-        params.sigma1_min = 0.004;
-        params.sigma1_max = 0.006;
+        params.sigma1_min = 0.001;
+        params.sigma1_max = 0.09;
 
         params.sigma2_init = 0.0099;
-        params.sigma2_min = 0.0085;
-        params.sigma2_max = 0.0115;
+        params.sigma2_min = 0.001;
+        params.sigma2_max = 0.09;
 
         params.c1_init = 0.66;
-        params.c1_min  = 0.60;
-        params.c1_max  = 0.70;
+        params.c1_min  = 0.1;
+        params.c1_max  = 0.9;
     
-        params.N_min = 250;
-        params.N_max = 270;
+        params.N_min = 0;
+        params.N_max = 100000;
     }
     else if (particle == "X3872"){
         params.interval_fit_min = 3.8;
@@ -238,7 +240,7 @@ void fit_mc_signal_roofit(TString particle) {
 
         params.sigma1_init = 0.0056;
         params.sigma1_min = 0.001;
-        params.sigma1_max = 0.04;
+        params.sigma1_max = 0.08;
 
         params.sigma2_init = 0.0125;
         params.sigma2_min = 0.001;
@@ -249,7 +251,7 @@ void fit_mc_signal_roofit(TString particle) {
         params.c1_max  = 0.99;
     
         params.N_min = 0;
-        params.N_max = 99999999;
+        params.N_max = 100000;
     }
 
     // RooFit: variável observável
@@ -294,6 +296,7 @@ void fit_mc_signal_roofit(TString particle) {
     // Dar Nome ao Eixo dos xx Dependendo da Partícula
     frame->GetXaxis()->SetTitle(X_Axis_Title);
     frame->GetYaxis()->SetTitle(Form("Events / ( %.4f )", interval_of_bins));
+    frame->GetYaxis()->SetTitleOffset(1.35);
 
     data.plotOn(frame, MarkerStyle(20), MarkerSize(1.0), Name("h_roofit")); // Circle marker
     model.plotOn(frame, LineColor(kBlue), Name("model"), Range("fitRange"), NormRange("fitRange")); // Blue model line
@@ -349,8 +352,8 @@ void fit_mc_signal_roofit(TString particle) {
 
 // Particles 2G Monte Carlo: Bd, Bu, X3872, PSI2S
 void mc_double_gaussian_fit() {
+    fit_mc_signal_roofit("Bd");
     //fit_mc_signal_roofit("Bu");
-    //fit_mc_signal_roofit("Bd");
-    fit_mc_signal_roofit("X3872");
+    //fit_mc_signal_roofit("X3872");
     //fit_mc_signal_roofit("PSI2S");
 }

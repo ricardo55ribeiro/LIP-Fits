@@ -27,63 +27,91 @@ using namespace RooFit;
 #include <RooFitResult.h>
 #include <RooFit.h>
 #include <RooCmdArg.h>
+#include <RooCurve.h>
+#include <RooExtendPdf.h>
 
+
+// Aux: read y-value from the drawn curve at a given mass (for vertical line heights)
+double getYatMass(RooPlot* frame, double mass) {
+    for (int i = 0; i < frame->numItems(); ++i) {
+        RooCurve* curve = dynamic_cast<RooCurve*>(frame->getObject(i));
+        if (!curve) continue;
+        int n = curve->GetN();
+        double* x = curve->GetX();
+        double* y = curve->GetY();
+        for (int j = 0; j < n - 1; ++j) {
+            if (x[j] <= mass && mass <= x[j+1]) {
+                double slope = (y[j+1] - y[j]) / (x[j+1] - x[j]);
+                return y[j] + slope * (mass - x[j]);
+            }
+        }
+    }
+    return 0.0;
+}
 
 
 
 // B0 Particle
 void total_data_fit_Bd() {
-    double min_signal = 5.1721;
-    double max_signal = 5.3868;
+    const int nbins_plot = 100; // Number of bins for the plotted data
 
-    double xlow = 5.0;
-    double xhigh = 6.0;
-    int nbins = 150;
-    double bin_width = (xhigh - xlow)/nbins;
+    double min_signal = 5.204911988;
+    double max_signal = 5.356368012;
+
+    double xlow = 5.1;
+    double xhigh = 5.5;
+    const double bin_width_plot = (xhigh - xlow) / nbins_plot;  // Used in y-axis label
 
     
-    // Load real data histogram
-    TFile* fData = TFile::Open("DATA_ppRef_Bmass_Bd_150bin_2.root");
-    if (!fData || fData->IsZombie()) {
+    // Load real data tree
+    TFile* file = TFile::Open("data_firstCut_Kstar_1108.root");
+    if (!file || file->IsZombie()) {
         std::cerr << "Error: Could not open real data file." << std::endl;
         return;
     }
-    TH1F* hist = (TH1F*)fData->Get("DataBkg");
-    if (!hist) {
-        std::cerr << "Error: Histogram 'DataBkg' not found in file." << std::endl;
-        return;
-    }
-
-    if (hist->GetEntries() == 0) {
-        std::cerr << "Error: Histogram 'DataBkg' is empty." << std::endl;
+    TTree* tree = (TTree*)file->Get("tree");
+    if (!tree) {
+        std::cerr << "Error: TTree not found in file." << std::endl;
         return;
     }
 
     // RooFit: variable and data
-    RooRealVar Bmass("Bmass", "Bmass", xlow, xhigh);
-    Bmass.setRange("gaussRange", min_signal, max_signal);
-    RooDataHist data("data", "dataset", RooArgList(Bmass), hist);
+    RooRealVar B_mass("B_mass", "B_mass", xlow, xhigh);
+    B_mass.setRange("gaussRange", min_signal, max_signal);
+
+    RooBinning mainBins(nbins_plot, xlow, xhigh);
+    B_mass.setBinning(mainBins, "mainBins");
+
+    RooDataSet dataset("dataset", "Unbinned dataset from TTree", tree, RooArgSet(B_mass));
 
     // Signal: Double Gaussian
     RooRealVar mean("mean", "Mean", 5.29, 5.275, 5.3);
-    RooRealVar sigma("sigma", "Sigma1", 0.009, 0.001, 0.08);
 
-    // Gaussians
-    RooGaussian signal("signal", "Single Gaussian", Bmass, mean, sigma);
+    // Double Gaussian (shared mean)
+    RooRealVar sigma1("sigma1", "Sigma1", 0.009, 0.001, 0.08);
+    RooRealVar sigma2("sigma2", "Sigma2", 0.020, 0.001, 0.10);
+    RooRealVar c1("c1", "Fraction of Gauss1", 0.7, 0.0, 1.0);
+
+    RooGaussian gaus1("gaus1", "Gaussian 1", B_mass, mean, sigma1);
+    RooGaussian gaus2("gaus2", "Gaussian 2", B_mass, mean, sigma2);
+
+    // Signal shape becomes a sum of the two Gaussians
+    RooAddPdf signal("signal", "Double Gaussian", RooArgList(gaus1, gaus2), RooArgList(c1));
+
 
     RooRealVar Nsig("Nsig", "Signal Yield", 261, 0, 300000);
     RooExtendPdf signal_ext("signal_ext", "Extended Signal", signal, Nsig);
 
     // Background: Exponential model
     RooRealVar lambda("lambda", "Lambda", -2.72, -6.0, -0.1);
-    RooExponential expo("expo", "Background", Bmass, lambda);
+    RooExponential expo("expo", "Background", B_mass, lambda);
 
     //RooRealVar c0("c0", "c0", 1.0, -1e5, 1e5);
     //RooRealVar c1("c1", "c1", 0.0, -1e5, 1e5);
     //RooRealVar c2("c2", "c2", 0.0, -1e5, 1e5);
     //RooRealVar c3("c3", "c3", 0.0, -1e5, 1e5);
     //RooRealVar c4("c4", "c4", 0.0, -1e5, 1e5);
-    //RooPolynomial poly("poly", "4th-degree polynomial background", Bmass, RooArgList(c0, c1, c2, c3, c4));
+    //RooPolynomial poly("poly", "4th-degree polynomial background", B_mass, RooArgList(c0, c1, c2, c3, c4));
 
     RooRealVar Nbkg("Nbkg", "Background Yield", 1614, 0, 1700000);
     RooExtendPdf expo_ext("expo_ext", "Extended Exponential Background", expo, Nbkg);
@@ -92,16 +120,16 @@ void total_data_fit_Bd() {
     RooAddPdf model("model", "Signal + Background", RooArgList(signal_ext, expo_ext));
 
     // Fit (Extended Maximum Likelihood Method)
-    RooFitResult* result = model.fitTo(data, Save());
+    RooFitResult* result = model.fitTo(dataset, Save());
 
     // Compute background-only integrals in signal and sideband regions
-    Bmass.setRange("signalRegion", min_signal, max_signal);
-    Bmass.setRange("lowSideband", xlow, min_signal);
-    Bmass.setRange("highSideband", max_signal, xhigh);
+    B_mass.setRange("signalRegion", min_signal, max_signal);
+    B_mass.setRange("lowSideband", xlow, min_signal);
+    B_mass.setRange("highSideband", max_signal, xhigh);
 
-    double frac_bkg_signal = expo.createIntegral(Bmass, NormSet(Bmass), Range("signalRegion"))->getVal(); // Background in Signal Region
-    double frac_bkg_low    = expo.createIntegral(Bmass, NormSet(Bmass), Range("lowSideband"))->getVal(); // Background in Left Noise Region
-    double frac_bkg_high   = expo.createIntegral(Bmass, NormSet(Bmass), Range("highSideband"))->getVal(); // Background in Right Noise Region
+    double frac_bkg_signal = expo.createIntegral(B_mass, NormSet(B_mass), Range("signalRegion"))->getVal(); // Background in Signal Region
+    double frac_bkg_low    = expo.createIntegral(B_mass, NormSet(B_mass), Range("lowSideband"))->getVal(); // Background in Left Noise Region
+    double frac_bkg_high   = expo.createIntegral(B_mass, NormSet(B_mass), Range("highSideband"))->getVal(); // Background in Right Noise Region
 
     double total_bkg_yield = Nbkg.getVal(); // Total background
 
@@ -109,13 +137,13 @@ void total_data_fit_Bd() {
     double bkg_out_signal = total_bkg_yield * (frac_bkg_low + frac_bkg_high); // Ammount of Noise in Sidebands
     double f_b = bkg_in_signal / bkg_out_signal; // Calculating F_b
 
-    double frac_sig_in_signal = signal.createIntegral(Bmass, NormSet(Bmass), Range("signalRegion"))->getVal(); // Signal in Signal Region
+    double frac_sig_in_signal = signal.createIntegral(B_mass, NormSet(B_mass), Range("signalRegion"))->getVal(); // Signal in Signal Region
     double sig_yield_in_region = Nsig.getVal() * frac_sig_in_signal; // Ammount of Signal in Signal Region
 
 
 
     // Opening and Checking MC File
-    TFile *file_mc = TFile::Open("/lstore/cms/henrique/Bmeson/MC_DATA/MC_ppRef_Bmeson/Bd_phat5_Bfinder.root");
+    TFile *file_mc = TFile::Open("/lstore/cms/u25lekai/Bmeson/MC/ppRef/Bd_phat5_Bfinder.root");
     if (!file_mc || file_mc->IsZombie()) {
         std::cerr << "Error: Could not open MC file." << std::endl;
         return;
@@ -129,7 +157,8 @@ void total_data_fit_Bd() {
     }
 
     // Apply same cuts
-    TString cut_mc = Form("Balpha<0.184842 && Bnorm_svpvDistance_2D>3.9916 && Bchi2cl>0.05 && (%s) && (%s) && (%s)",
+    TString cut_mc = Form("Bchi2cl>0.003 && Bnorm_svpvDistance_2D>3.9916 && (%s) && (%s) && (%s) && (%s)",
+                        isMCsignal.Data(),
                         ACCcuts_ppRef.Data(),
                         SELcuts_ppRef.Data(),
                         TRGmatching.Data());
@@ -149,105 +178,132 @@ void total_data_fit_Bd() {
     double f_s = sig_yield_in_region / mc_yield_in_signal; // Calculating F_s
 
 
-    // Plotting
-    TCanvas *c = new TCanvas("c", "Bmass Fit", 800, 600);
-    RooPlot* frame = Bmass.frame();
-    data.plotOn(frame, MarkerStyle(20), MarkerSize(1.0));
 
-    // Plotting block with correct styles and legend names
-    data.plotOn(frame, MarkerStyle(20), MarkerSize(1.2), Name("data"));
+    // ---------- Canvas with two pads ----------
+    TCanvas* c = new TCanvas("c", "Bd Fit with Pulls", 800, 800);
+    c->Divide(1, 2);
+
+    // ---------- Top pad (fit) ----------
+    TPad* p1 = (TPad*)c->cd(1);
+    p1->SetPad(0.0, 0.15, 1.0, 1.0);
+    p1->SetBottomMargin(0.02);
+    p1->Draw();
+    p1->cd();
+
+    RooPlot* frame = B_mass.frame(Range(xlow, xhigh), Bins(nbins_plot));
+
+    // Plot data + model with the same naming/styles used for pulls
+    dataset.plotOn(frame, Binning(B_mass.getBinning("mainBins")), MarkerStyle(20), MarkerSize(1.2), Name("data"), DataError(RooAbsData::Poisson));
     model.plotOn(frame, LineColor(kBlue), LineWidth(2), Name("global"));  // Total model
     model.plotOn(frame, Components(expo_ext), LineColor(kRed), LineStyle(kDashed), LineWidth(2), Name("background"));
     model.plotOn(frame, Components(signal), LineColor(kGreen + 2), LineStyle(kDashed), LineWidth(2), Name("signal"));
 
-    
     frame->SetTitle("");
-    frame->GetXaxis()->SetTitle("m_{J/#Psi K^{*}} [GeV/c^{2}]");
-    frame->GetYaxis()->SetTitle(Form("Events / ( %.4f )", bin_width));
-    frame->GetYaxis()->SetTitleOffset(1.4);
+    frame->GetYaxis()->SetTitleOffset(1.5);
+    frame->GetXaxis()->SetLabelSize(0);  // hide x labels on top pad
+    frame->GetYaxis()->SetTitle(Form("Events / ( %.4f )", bin_width_plot));
     frame->Draw();
 
-    // Vertical lines at signal region edges
-    double binWidth = 0.01;
-    double total_yield = Nsig.getVal() + Nbkg.getVal();
+    // Vertical dashed lines at signal-region edges (heights taken from drawn curve)
+    double y_low  = getYatMass(frame, min_signal);
+    double y_high = getYatMass(frame, max_signal);
 
-    Bmass.setVal(min_signal);
-    double y_low = model.getVal(RooArgSet(Bmass)) * total_yield * binWidth;
-
-    Bmass.setVal(max_signal);
-    double y_high = model.getVal(RooArgSet(Bmass)) * total_yield * binWidth;
-
-    // Create vertical dashed black lines
-    TLine* line_low = new TLine(min_signal, 0, min_signal, y_low);
+    TLine* line_low  = new TLine(min_signal, 0, min_signal, y_low);
     TLine* line_high = new TLine(max_signal, 0, max_signal, y_high);
+    for (TLine* l : {line_low, line_high}) {
+        l->SetLineColor(kBlack);
+        l->SetLineStyle(2);
+        l->SetLineWidth(2);
+        l->Draw("same");
+    }
 
-
-    line_low->SetLineColor(kBlack);
-    line_low->SetLineStyle(2);
-    line_low->SetLineWidth(2);
-
-    line_high->SetLineColor(kBlack);
-    line_high->SetLineStyle(2);
-    line_high->SetLineWidth(2);
-
-    // Draw lines
-    line_low->Draw("same");
-    line_high->Draw("same");
-
-
-    // Chi2 and fit parameters
+    // Chi2 after plotting on frame
     int nParams = result->floatParsFinal().getSize();
-    double chi2 = frame->chiSquare(nParams);
-    
-    // Custom Legend (top-right, styled as image)
-    TLegend* legend = new TLegend(0.58, 0.66, 0.88, 0.88);  // Adjust position as needed
+    double chi2 = frame->chiSquare("global", "data", nParams);
+
+
+    // ---------- Legend (same place), on TOP pad ----------
+    p1->cd();
+    TLegend* legend = new TLegend(0.58, 0.66, 0.88, 0.88);
     legend->SetTextFont(42);
     legend->SetTextSize(0.025);
     legend->SetBorderSize(1);
     legend->SetLineColor(kBlack);
-    legend->SetFillStyle(0);  // transparent background
-
+    legend->SetFillStyle(0);
     legend->AddEntry(frame->findObject("data"), "Data (B^{0} )", "lep");
     legend->AddEntry(frame->findObject("background"), "Background Fit (Exponential)", "l");
-    legend->AddEntry(frame->findObject("signal"), "Signal Fit (Single Gaussian)", "l");
+    legend->AddEntry(frame->findObject("signal"), "Signal Fit (Double Gaussian)", "l");
     legend->AddEntry(frame->findObject("global"), "Signal + Background Fit", "l");
-
     legend->Draw();
-        
 
-    // TPaveText (bottom)
+    // ---------- TPaveText (same place), on TOP pad ----------
+    p1->cd();
     TPaveText* pave = new TPaveText(0.63, 0.38, 0.88, 0.66, "NDC");
-    pave->SetTextAlign(12);  // left-aligned
-    pave->SetTextFont(42);   // Helvetica
+    pave->SetTextAlign(12);
+    pave->SetTextFont(42);
     pave->SetTextSize(0.025);
-    pave->SetFillColor(0);   // transparent
-    pave->SetBorderSize(1);  // thin box
-
-    // Add formatted lines
+    pave->SetFillColor(0);
+    pave->SetBorderSize(1);
     pave->AddText(Form("Mean = %.5f #pm %.5f", mean.getVal(), mean.getError()));
-    pave->AddText(Form("#sigma = %.5f #pm %.5f", sigma.getVal(), sigma.getError()));
+
+    pave->AddText(Form("#sigma_{1} = %.5f #pm %.5f", sigma1.getVal(), sigma1.getError()));
+    pave->AddText(Form("#sigma_{2} = %.5f #pm %.5f", sigma2.getVal(), sigma2.getError()));
+    pave->AddText(Form("c1 = %.3f #pm %.3f", c1.getVal(), c1.getError()));
+
     pave->AddText(Form("N_{sig} = %.1f #pm %.1f", Nsig.getVal(), Nsig.getError()));
     pave->AddText(Form("#lambda = %.5f #pm %.5f", lambda.getVal(), lambda.getError()));
     pave->AddText(Form("N_{bkg} = %.1f #pm %.1f", Nbkg.getVal(), Nbkg.getError()));
     pave->AddText(Form("#chi^{2}/ndf = %.2f", chi2));
+    pave->Draw();
 
-    pave->Draw();    // draw on top
-
-
-    // xxAdditional Legend-Like Box for f_s and f_b
-    TPaveText* pave_fb_fs = new TPaveText(0.46, 0.77, 0.58, 0.88, "NDC");  // Adjust position if needed
-    pave_fb_fs->SetTextAlign(12);  // Left-aligned
+    // ---------- f_b / f_s box (same place), on TOP pad ----------
+    p1->cd();
+    TPaveText* pave_fb_fs = new TPaveText(0.46, 0.77, 0.58, 0.88, "NDC");
+    pave_fb_fs->SetTextAlign(12);
     pave_fb_fs->SetTextFont(42);
     pave_fb_fs->SetTextSize(0.025);
     pave_fb_fs->SetFillColor(0);
-    pave_fb_fs->SetBorderSize(1);  // thin frame
-
+    pave_fb_fs->SetBorderSize(1);
     pave_fb_fs->AddText(Form("f_{b} = %.3f", f_b));
     pave_fb_fs->AddText(Form("f_{s} = %.3f", f_s));
+    pave_fb_fs->Draw();
 
-    pave_fb_fs->Draw();  // Draw it on top of the plot
+    // ---------- Bottom pad (pulls) ----------
+    TPad* p2 = (TPad*)c->cd(2);
+    p2->SetPad(0.0, 0.0, 1.0, 0.15);
+    p2->SetTopMargin(0.05);
+    p2->SetBottomMargin(0.25);
+    p2->Draw();
+    p2->cd();
 
-    c->SaveAs("Bd_Total_Fit_Binned.pdf");
+    RooPlot* pullFrame = B_mass.frame();
+    RooHist* pullHist = frame->pullHist("data", "global");   // names must match
+    pullHist->SetMarkerSize(0.6);
+    pullFrame->addPlotable(pullHist, "XP");
+
+    pullFrame->SetTitle("");
+    pullFrame->GetYaxis()->SetTitle("Pull");
+    pullFrame->GetYaxis()->SetNdivisions(505);
+    pullFrame->GetYaxis()->SetTitleSize(0.10);
+    pullFrame->GetYaxis()->SetTitleOffset(0.40);
+    pullFrame->GetYaxis()->SetLabelSize(0.08);
+    pullFrame->GetXaxis()->SetTitle("m_{J/#Psi K^{*}} [GeV/c^{2}]");
+    pullFrame->GetXaxis()->SetTitleSize(0.10);
+    pullFrame->GetXaxis()->SetTitleOffset(1.0);
+    pullFrame->GetXaxis()->SetLabelSize(0.08);
+    pullFrame->SetMinimum(-3.5);
+    pullFrame->SetMaximum(3.5);
+    pullFrame->Draw("AP");
+
+    TLine* zeroLine = new TLine(xlow, 0, xhigh, 0);
+    zeroLine->SetLineColor(kBlue);
+    zeroLine->SetLineStyle(1);
+    zeroLine->SetLineWidth(1);
+    zeroLine->Draw("same");
+
+
+
+    c->SaveAs("Bd_Total_Fit_With_Pulls.pdf");
 
     std::cout << std::fixed << std::setprecision(2);
     std::cout << " " << std::endl;
@@ -262,10 +318,10 @@ void total_data_fit_Bd() {
     std::cout << "f_{s} = " << f_s << std::endl;
     std::cout << " " << std::endl; 
 
-    std::cout << "Gaussian + Exponential fit complete. Output saved to 'Bd_Total_Fit_Binned.pdf'" << std::endl;
+    std::cout << "Gaussian + Exponential fit complete. Output saved to 'Bd_Total_Fit_With_Pulls.pdf'" << std::endl;
 
     delete c;
-    delete hist;
+    delete tree;
     delete line_low;
     delete line_high;
 }

@@ -71,9 +71,11 @@ void total_data_fit_erfc_Bu() {
     double min_signal = 5.178948768;
     double max_signal = 5.380091232;
 
+    double mc_mean = 5.27952;
     double mc_sigma1 = 0.03702;
     double mc_sigma2 = 0.01609;
     double mc_c1 = 0.3358;
+    
 
     double xlow = 5.0;
     double xhigh = 5.8;
@@ -81,7 +83,7 @@ void total_data_fit_erfc_Bu() {
     double bin_width_plot = (xhigh - xlow) / nbins_plot;
 
     // Load ROOT file and TTree
-    TFile *file = TFile::Open("data_unbinned_Bu_FinalCut.root");
+    TFile *file = TFile::Open("data_unbinned_Bu_LekaiCut.root");
     // data_unbinned_Bu_SecondCut.root
     // data_unbinned_Bu_first.root
     // data_Rsideband_Bu_afterChi_FinalCutted.root
@@ -180,7 +182,7 @@ void total_data_fit_erfc_Bu() {
     double sig_yield_in_region = Nsig.getVal() * frac_sig_in_signal;  // Signal in signal region (S_data)
 
     // Open and process the MC file for signal region yield
-    TFile *file_mc = TFile::Open("/lstore/cms/u25lekai/Bmeson/MC/ppRef/Bu_phat5_Bfinder.root");
+    TFile *file_mc = TFile::Open("/lstore/cms/lekai/Bmeson/MC/ppRef/Bu_phat5_Bfinder.root");
     if (!file_mc || file_mc->IsZombie()) {
         std::cerr << "Error: Could not open MC file." << std::endl;
         return;
@@ -280,7 +282,7 @@ void total_data_fit_erfc_Bu() {
     pave->SetFillColor(0);
     pave->SetBorderSize(1);
     // Signal: Double Gaussian
-    pave->AddText(Form("Mean = %.5f #pm %.5f", mean.getVal(), mean.getError()));
+    pave->AddText(Form("Mean (fixed) = %.5f #pm %.5f", mean.getVal(), mean.getError()));
     pave->AddText(Form("#sigma_{1} (fixed) = %.5f", sigma1_mc.getVal()));
     pave->AddText(Form("#sigma_{2} (fixed) = %.5f", sigma2_mc.getVal()));
     pave->AddText(Form("c_{1} (fixed) = %.4f", c1.getVal()));
@@ -349,7 +351,7 @@ void total_data_fit_erfc_Bu() {
 
 
     // Save the canvas to a file
-    TString name_file = "Bu_Total_Fit_Erfc_with_Pulls.pdf";
+    TString name_file = "Bu_Total_Fit_Nominal.pdf";
     c->SaveAs(name_file);
 
     /*

@@ -1,5 +1,7 @@
 using namespace RooFit;
 
+#include <algorithm>
+#include <cmath>
 #include <TFile.h>
 #include <TTree.h>
 #include <TCanvas.h>
@@ -23,6 +25,7 @@ using namespace RooFit;
 #include <RooExponential.h>
 #include <RooGenericPdf.h>  
 #include <RooProdPdf.h>
+#include <RooExtendPdf.h>
 
 #include <RooFitResult.h>
 #include <RooFit.h>
@@ -72,8 +75,12 @@ void total_data_fit_PSI_and_X3872(){
     const double bin_width_plot = (xhigh - xlow) / nbins_plot;
 
     // Load ROOT file and TTree
-    TFile *file = TFile::Open("MC_ppRef_Bmass_PSI2S_X3872_newoptimized.root");
+    TFile *file = TFile::Open("data_unbinned_X_FirstCut_1408.root");
+    // MC_ppRef_Bmass_PSI2S_X3872_newX.root
+    // MC_ppRef_Bmass_PSI2S_X3872_newoptimizedcutf.root
+    // MC_ppRef_Bmass_PSI2S_X3872_newoptimized.root
     // data_unbinned_X_FirstCut.root
+    // data_unbinned_X.root
     if (!file || file->IsZombie()) {
         std::cerr << "Error: Could not open real data file." << std::endl;
         return;
@@ -99,12 +106,12 @@ void total_data_fit_PSI_and_X3872(){
     RooRealVar mean_psi2s("mean_psi2s", "Mean", 3.686, 3.67, 3.70);
     RooRealVar sigma1_psi2s("sigma1_psi2s", "Sigma1", 0.0036, 0.001, 0.1);
     RooRealVar sigma2_psi2s("sigma2_psi2s", "Sigma2", 0.008, 0.001, 0.1);
-    RooRealVar c1_psi2s("c1_psi2s", "Fraction of Gaussian1", 0.44, 0.01, 0.99);
+    RooRealVar c1_psi2s("c1_psi2s", "Fraction of Gaussian1", 0.4322, 0.01, 0.99);
     RooGaussian gauss1_psi2s("gauss1_psi2s", "Narrow Gaussian", B_mass, mean_psi2s, sigma1_psi2s);
     RooGaussian gauss2_psi2s("gauss2_psi2s", "Wide Gaussian", B_mass, mean_psi2s, sigma2_psi2s);
     RooAddPdf signal_raw_psi2s("signal_raw_psi2s", "Double Gaussian Model", RooArgList(gauss1_psi2s, gauss2_psi2s), RooArgList(c1_psi2s));
 
-    RooRealVar Nsig_psi2s("Nsig_psi2s", "Signal Yield", 46960, 400, 500000);
+    RooRealVar Nsig_psi2s("Nsig_psi2s", "Signal Yield", 44911.1, 400, 500000);
     RooExtendPdf signal_ext_psi2s("signal_ext_psi2s", "Extended Gated Signal", signal_raw_psi2s, Nsig_psi2s);
 
 
@@ -117,12 +124,12 @@ void total_data_fit_PSI_and_X3872(){
     RooAddPdf   signal_raw_x("signal_raw_x", "Double Gaussian X (shared shape)",
                             RooArgList(gauss1_x, gauss2_x), RooArgList(c1_psi2s));
 
-    RooRealVar Nsig_x("Nsig_x", "Yield X(3872)", 3458, 30, 400000);
+    RooRealVar Nsig_x("Nsig_x", "Yield X(3872)", 3272.0, 30, 400000);
     RooExtendPdf signal_ext_x("signal_ext_x", "Extended X(3872)", signal_raw_x, Nsig_x);
 
 
     // Background model: Exponential
-    RooRealVar a0("a0", "Cheb0", 0.072, -1.0, 1.0);
+    RooRealVar a0("a0", "Cheb0", 0.0704, -1.0, 1.0);
     RooRealVar a1("a1", "Cheb1", -0.095, -1.0, 1.0);
     RooRealVar a2("a2", "Cheb2", 0.017, -1.0, 1.0);
     RooRealVar a3("a3", "Cheb3", 0, -1.0, 1.0);
@@ -194,7 +201,7 @@ void total_data_fit_PSI_and_X3872(){
         file_mc_psi2s->Close();
         return;
     }
-    TString cut_mc_psi2s = Form("Bchi2cl>0.003 && BQvalueuj<0.14274 && (%s) && (%s) && (%s) && (%s)",
+    TString cut_mc_psi2s = Form("Bchi2cl>0.003 && BQvalueuj<0.14274 && Bnorm_svpvDistance<2.39 && (%s) && (%s) && (%s) && (%s)",
                         isMCsignal.Data(),
                         ACCcuts_ppRef.Data(),
                         SELcuts_ppRef.Data(),
@@ -220,7 +227,7 @@ void total_data_fit_PSI_and_X3872(){
         file_mc_x3872->Close();
         return;
     }
-    TString cut_mc_x3872 = Form("Bchi2cl>0.02 && BQvalueuj<0.2 && (%s) && (%s) && (%s) && (%s)",
+    TString cut_mc_x3872 = Form("Bchi2cl>0.003 && BQvalueuj<0.14274 && Bnorm_svpvDistance<2.39 && (%s) && (%s) && (%s) && (%s)",
                         isMCsignal.Data(),
                         ACCcuts_ppRef.Data(),
                         SELcuts_ppRef.Data(),
@@ -275,7 +282,7 @@ void total_data_fit_PSI_and_X3872(){
 
     frame->SetTitle("");
     frame->GetYaxis()->SetTitle(Form("Events / ( %.4f )", bin_width_plot));
-    frame->GetYaxis()->SetTitleOffset(1.48);
+    frame->GetYaxis()->SetTitleOffset(1.52);
     frame->GetXaxis()->SetLabelSize(0);  // hide x labels
     frame->Draw();
 
@@ -288,6 +295,7 @@ void total_data_fit_PSI_and_X3872(){
 
     double y_top    = gPad->GetUymax(); // top visible Y coordinate
 
+    /*
     TLine* line_min_psi2s = new TLine(min_signal_psi2s, y_bottom, min_signal_psi2s, y_top);
     TLine* line_max_psi2s = new TLine(max_signal_psi2s, y_bottom, max_signal_psi2s, y_top);
     TLine* line_min_x3872 = new TLine(min_signal_x3872, y_bottom, min_signal_x3872, y_top);
@@ -299,6 +307,7 @@ void total_data_fit_PSI_and_X3872(){
         l->SetLineWidth(2);
         l->Draw("same");
     }
+    */
 
     // -------- Move the legend back to the top pad ----------
     TLegend* legend = new TLegend(0.35, 0.7, 0.63, 0.97);
@@ -339,12 +348,13 @@ void total_data_fit_PSI_and_X3872(){
 
     pullFrame->Draw("AP");
 
+    
     TLine* zeroLine = new TLine(xlow, 0, xhigh, 0);
     zeroLine->SetLineColor(kBlue);
     zeroLine->SetLineStyle(1);
     zeroLine->SetLineWidth(1);
     zeroLine->Draw("same");
-
+    
 
     // Calculate chi2/ndf
     int nParams = result->floatParsFinal().getSize();
@@ -385,7 +395,7 @@ void total_data_fit_PSI_and_X3872(){
 
     pave->Draw();
 
-    
+    /*
     // TPaveText for f_b and f_s
     p1->cd();  // Move to top panel
     TPaveText* pave_fb_fs = new TPaveText(0.44, 0.54, 0.63, 0.7, "NDC");  // Repositioned
@@ -399,7 +409,7 @@ void total_data_fit_PSI_and_X3872(){
     pave_fb_fs->AddText(Form("f_{s #psi(2S)} = %.3f", f_s_psi2s));
     pave_fb_fs->AddText(Form("f_{s X(3872)} = %.3f", f_s_x3872));
     pave_fb_fs->Draw();
-    
+    */
 
     // Save the canvas to a file
     TString name_file = "PSI_and_X3872_Total_Fit_with_Pulls.pdf";
@@ -412,49 +422,99 @@ void total_data_fit_PSI_and_X3872(){
     double zoom_low  = min_signal_x3872;
     double zoom_high = max_signal_x3872;
 
-    // Snap the zoom edges to the MAIN bin grid so the first/last bins are *full* bins (no truncation).
-    // This keeps the bin width equal to bin_width_plot, matching the y-axis label.
-    {
-        // nearest-bin index from the global lower edge
-        int ibin_low  = int( (zoom_low  - xlow) / bin_width_plot + 0.5 );
-        int ibin_high = int( (zoom_high - xlow) / bin_width_plot + 0.5 );
+    // Optional: override the number of bins in the zoom (0 = auto to match main bin width approximately)
+    const int nbins_zoom_override = 100;
 
-        // rebuild snapped edges
-        zoom_low  = xlow + ibin_low  * bin_width_plot;
-        zoom_high = xlow + ibin_high * bin_width_plot;
+    // Decide the number of zoom bins
+    int nbins_zoom = nbins_zoom_override > 0
+                    ? nbins_zoom_override
+                    : std::max(1, int(std::round((zoom_high - zoom_low) / bin_width_plot)));
 
-        // keep inside the global fit range and ensure non-empty window
-        if (zoom_low  < xlow)  zoom_low  = xlow;
-        if (zoom_high > xhigh) zoom_high = xhigh;
-        if (zoom_high <= zoom_low) zoom_high = zoom_low + bin_width_plot;
-    }
+    // Define a binning that exactly covers [zoom_low, zoom_high] with nbins_zoom bins
+    RooBinning zoomBins(nbins_zoom, zoom_low, zoom_high);
+    B_mass.setBinning(zoomBins, "zoomBins");
 
-    // Name the zoom range so we can cut data and draw the pdf in that window only
+    // Bin width for the y-axis label in the zoom
+    double bin_width_zoom = (zoom_high - zoom_low) / double(nbins_zoom);
+
+    // Name the zoom range so we can cut data and draw the pdf there only
     B_mass.setRange("xzoom", zoom_low, zoom_high);
 
-    TCanvas* c_zoom = new TCanvas("c_zoom", "Zoom around X(3872)", 800, 600);
+    // Canvas with two pads: top = fit, bottom = pulls
+    TCanvas* c_zoom = new TCanvas("c_zoom", "Zoom around X(3872) with Pulls", 800, 600);
+    c_zoom->Divide(1, 2);
 
-    // Note: Bins() here controls curve sampling only; data binning comes from Binning(mainBins)
+    // Top pad (fit)
+    TPad* pz1 = (TPad*)c_zoom->cd(1);
+    pz1->SetPad(0.0, 0.22, 1.0, 1.0);
+    pz1->SetBottomMargin(0.02);
+
+    // Bottom pad (pulls)
+    TPad* pz2 = (TPad*)c_zoom->cd(2);
+    pz2->SetPad(0.0, 0.0, 1.0, 0.22);
+    pz2->SetTopMargin(0.05);
+    pz2->SetBottomMargin(0.32);
+
+    // ---------------------------
+    // Top: zoomed fit
+    // ---------------------------
+    pz1->cd();
+
     RooPlot* frame_zoom = B_mass.frame(Range("xzoom"));
 
-    // DATA: use the SAME global binning (mainBins) but CUT to the snapped zoom range
+    // DATA: use the zoomBins we just defined (no truncated edge bins)
     dataset.plotOn(frame_zoom,
                 CutRange("xzoom"),
-                Binning(B_mass.getBinning("mainBins")),
-                MarkerStyle(20), MarkerSize(1.2), DataError(RooAbsData::Poisson));
+                Binning(B_mass.getBinning("zoomBins")),
+                MarkerStyle(20), MarkerSize(1.2), DataError(RooAbsData::Poisson),
+                Name("data_zoom"));
 
     // MODEL: draw only in the zoom range, but keep normalization to the full fit range
     model.plotOn(frame_zoom,
-                LineColor(kBlue), LineWidth(2), Name("global"),
+                LineColor(kBlue), LineWidth(2), Name("global_zoom"),
                 Range("xzoom"), NormRange("fitRange"));
 
     frame_zoom->SetTitle("");
-    frame_zoom->GetXaxis()->SetTitle("m_{J/#psi#pi^{+}#pi^{-}} [GeV/c^{2}]");
-    // Keep the same y-axis label style AND the same reference bin width as the main plot
-    frame_zoom->GetYaxis()->SetTitle(Form("Events / ( %.4f )", bin_width_plot));
+    frame_zoom->GetYaxis()->SetTitle(Form("Events / ( %.4f )", bin_width_zoom));
     frame_zoom->GetYaxis()->SetTitleOffset(1.48);
+    frame_zoom->GetXaxis()->SetLabelSize(0);  // hide x labels in top pad
 
     frame_zoom->Draw();
+
+    // ---------------------------
+    // Bottom: pulls
+    // ---------------------------
+    pz2->cd();
+
+    RooPlot* pullFrame_zoom = B_mass.frame(Range("xzoom"));
+    RooHist*  pullHist_zoom  = frame_zoom->pullHist("data_zoom", "global_zoom");
+    pullHist_zoom->SetMarkerSize(0.6);
+    pullFrame_zoom->addPlotable(pullHist_zoom, "XP");
+
+    pullFrame_zoom->SetTitle("");
+    pullFrame_zoom->GetYaxis()->SetTitle("Pull");
+    pullFrame_zoom->GetYaxis()->SetNdivisions(505);
+    pullFrame_zoom->GetYaxis()->SetTitleSize(0.12);
+    pullFrame_zoom->GetYaxis()->SetTitleOffset(0.4);
+    pullFrame_zoom->GetYaxis()->SetLabelSize(0.10);
+
+    pullFrame_zoom->GetXaxis()->SetTitle("m_{J/#psi#pi^{+}#pi^{-}} [GeV/c^{2}]");
+    pullFrame_zoom->GetXaxis()->SetTitleSize(0.12);
+    pullFrame_zoom->GetXaxis()->SetTitleOffset(1.0);
+    pullFrame_zoom->GetXaxis()->SetLabelSize(0.10);
+
+    pullFrame_zoom->SetMinimum(-3.5);
+    pullFrame_zoom->SetMaximum( 3.5);
+
+    pullFrame_zoom->Draw("AP");
+
+    // Zero line
+    TLine* zeroLineZoom = new TLine(zoom_low, 0, zoom_high, 0);
+    zeroLineZoom->SetLineColor(kBlue);
+    zeroLineZoom->SetLineStyle(1);
+    zeroLineZoom->SetLineWidth(1);
+    zeroLineZoom->Draw("same");
+
     c_zoom->SaveAs("Zoom_X3872.pdf");
 
     // Clean up

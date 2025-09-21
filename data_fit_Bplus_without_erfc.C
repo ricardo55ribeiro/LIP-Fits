@@ -54,7 +54,7 @@ double getYatMass(RooPlot* frame, double mass) {
 void total_data_fit_Bu() {
     const int nbins_plot = 100; // Number of Bins for the Plot
 
-    double min_signal = 5.178948768;
+    double min_signal = 5.178948768-0.048;
     double max_signal = 5.380091232;
 
     double mc_sigma1 = 0.03702;
@@ -67,7 +67,7 @@ void total_data_fit_Bu() {
     double bin_width_plot = (xhigh - xlow) / nbins_plot;
 
     // Load ROOT file and TTree
-    TFile *file = TFile::Open("data_unbinned_Bu_FinalCut.root");
+    TFile *file = TFile::Open("data_unbinned_Bu_LekaiCut.root");
     // data_unbinned_Bu_final.root
     // dataCutted_Bu.root
     if (!file || file->IsZombie()) {
@@ -87,6 +87,9 @@ void total_data_fit_Bu() {
     // Create unbinned RooDataSet from TTree
     B_mass.setRange("gaussRange", min_signal, max_signal);
     RooDataSet dataset("dataset", "Unbinned dataset from TTree", tree, RooArgSet(B_mass));
+
+    B_mass.setRange("fitRange", min_signal, xhigh);  // the range actually used in the fit
+
 
     // Signal model: Double Gaussian
     RooRealVar mean("mean", "Mean", 5.27764, 5.27, 5.29);
@@ -127,6 +130,14 @@ void total_data_fit_Bu() {
     // Fit the model to data (Extended Maximum Likelihood)
     RooFitResult* result = model.fitTo(dataset, Save(), Range(min_signal, xhigh));
 
+    // Fraction of the signal pdf that lies in the fit range (normalized to full [xlow,xhigh])
+    RooAbsReal* fracSigInFit = signal.createIntegral(B_mass, NormSet(B_mass), Range("fitRange"));
+    // Convert fitted Nsig (in fit range) to an equivalent yield over the full plotting window [xlow,xhigh]
+    double Nsig_fullRange     = Nsig.getVal()   / fracSigInFit->getVal();
+    double Nsig_fullRange_err = Nsig.getError() / fracSigInFit->getVal();
+    delete fracSigInFit;
+
+
     /*
     // Define regions for integrals
     B_mass.setRange("signalRegion", min_signal, max_signal);
@@ -147,7 +158,7 @@ void total_data_fit_Bu() {
     double sig_yield_in_region = Nsig.getVal() * frac_sig_in_signal;  // Signal in signal region (S_data)
 
     // Open and process the MC file for signal region yield
-    TFile *file_mc = TFile::Open("/lstore/cms/u25lekai/Bmeson/MC/ppRef/Bu_phat5_Bfinder.root");
+    TFile *file_mc = TFile::Open("/lstore/cms/lekai/Bmeson/MC/ppRef/Bu_phat5_Bfinder.root");
     if (!file_mc || file_mc->IsZombie()) {
         std::cerr << "Error: Could not open MC file." << std::endl;
         return;
@@ -252,6 +263,7 @@ void total_data_fit_Bu() {
     pave->AddText(Form("c_{1} (fixed) = %.4f", c1.getVal()));
     pave->AddText(Form("C_{s} = %.5f #pm %.5f", Cs.getVal(), Cs.getError()));
     pave->AddText(Form("N_{sig} = %.1f #pm %.1f", Nsig.getVal(), Nsig.getError()));
+    pave->AddText(Form("N_{sig}^{[%.1f, %.1f]} (rescaled) = %.1f #pm %.1f", xlow, xhigh, Nsig_fullRange, Nsig_fullRange_err));
     // Exponential background
     pave->AddText(Form("#lambda = %.4f #pm %.4f", lambda.getVal(), lambda.getError()));
     pave->AddText(Form("N_{bkg} = %.1f #pm %.1f", Nbkg.getVal(), Nbkg.getError()));
